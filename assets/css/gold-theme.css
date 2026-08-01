@@ -1,0 +1,472 @@
+/* ==========================================================================
+   Global Trade — Gold on Black theme override
+   Loads AFTER style.css, style-preset.css, bg-animation.css.
+   Do not edit those vendor files directly - add overrides here instead.
+   ========================================================================== */
+
+:root {
+  /* ---- Global Trade palette (sampled from assets/images/brand-logo.png) ---- */
+  --gt-bg: #0d0b07;
+  --gt-bg-elevated: #16130c;
+  --gt-card-bg: #1a1610;
+  --gt-card-border: #2e2920;
+  --gt-sidebar-bg: #100d08;
+  --gt-header-bg: rgba(16, 13, 8, 0.85);
+
+  --gt-gold-1: #f8ce4e;
+  --gt-gold-2: #e6ad1f;
+  --gt-gold-3: #a5731c;
+  --gt-gold-2-rgb: 230, 173, 31;
+
+  --gt-text: #ece8df;
+  --gt-text-muted: #9c9488;
+  --gt-heading: #f6efdd;
+
+  --gt-border: #2e2920;
+  --gt-border-light: #403a2e;
+
+  --gt-success: #2fbf71;
+  --gt-success-rgb: 47, 191, 113;
+  --gt-danger: #e5484d;
+  --gt-danger-rgb: 229, 72, 77;
+  --gt-warning: #f5a623;
+  --gt-warning-rgb: 245, 166, 35;
+  --gt-info: #4dabf7;
+  --gt-info-rgb: 77, 171, 247;
+
+  /* ---- Bootstrap base overrides ---- */
+  --bs-body-bg: var(--gt-bg);
+  --bs-body-bg-rgb: 13, 11, 7;
+  --bs-body-color: var(--gt-text);
+  --bs-body-color-rgb: 236, 232, 223;
+  --bs-heading-color: var(--gt-heading);
+  --bs-border-color: var(--gt-border);
+
+  /* Secondary/tertiary text+bg — .text-muted resolves to --bs-secondary-color,
+     vendor default is a dark rgba meant for light backgrounds */
+  --bs-emphasis-color: var(--gt-heading);
+  --bs-emphasis-color-rgb: 246, 239, 221;
+  --bs-secondary-color: var(--gt-text-muted);
+  --bs-secondary-color-rgb: 156, 148, 136;
+  --bs-secondary-bg: var(--gt-bg-elevated);
+  --bs-secondary-bg-rgb: 22, 19, 12;
+  --bs-tertiary-color: rgba(236, 232, 223, 0.55);
+  --bs-tertiary-color-rgb: 236, 232, 223;
+  --bs-tertiary-bg: var(--gt-bg-elevated);
+  --bs-tertiary-bg-rgb: 22, 19, 12;
+
+  --bs-primary: var(--gt-gold-2);
+  --bs-primary-rgb: var(--gt-gold-2-rgb);
+  --bs-primary-light: rgba(230, 173, 31, 0.14);
+  --bs-link-color: var(--gt-gold-2);
+  --bs-link-color-rgb: var(--gt-gold-2-rgb);
+  --bs-link-hover-color: var(--gt-gold-1);
+
+  --bs-success: var(--gt-success);
+  --bs-success-rgb: var(--gt-success-rgb);
+  --bs-danger: var(--gt-danger);
+  --bs-danger-rgb: var(--gt-danger-rgb);
+  --bs-warning: var(--gt-warning);
+  --bs-warning-rgb: var(--gt-warning-rgb);
+  --bs-info: var(--gt-info);
+  --bs-info-rgb: var(--gt-info-rgb);
+
+  /* ---- Able Pro structural vars ---- */
+  --pc-heading-color: var(--gt-heading);
+  --pc-active-background: var(--gt-bg-elevated);
+
+  --pc-sidebar-background: var(--gt-sidebar-bg);
+  --pc-sidebar-color: var(--gt-text-muted);
+  --pc-sidebar-color-rgb: 156, 148, 136;
+  --pc-sidebar-active-color: var(--gt-gold-2);
+  --pc-sidebar-shadow: none;
+  --pc-sidebar-caption-color: var(--gt-gold-3);
+  --pc-sidebar-border: 1px solid var(--gt-border);
+  --pc-sidebar-user-background: var(--gt-bg-elevated);
+
+  --pc-header-background: var(--gt-header-bg);
+  --pc-header-color: var(--gt-text);
+  --pc-header-shadow: none;
+  --pc-header-submenu-background: var(--gt-card-bg);
+  --pc-header-submenu-color: var(--gt-text);
+
+  --pc-card-box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(230, 173, 31, 0.06);
+}
+
+/* ==========================================================================
+   preset-8 hardcoded selectors - the vendor CSS bakes literal hex values
+   into these rules instead of referencing :root vars, so a var override
+   alone will not recolor them. Re-declared here with matching selectors/
+   specificity (loads after style-preset.css, same specificity => wins).
+   ========================================================================== */
+[data-pc-preset=preset-8] {
+  --pc-sidebar-active-color: var(--gt-gold-2);
+  --bs-blue: var(--gt-gold-2);
+  --bs-primary: var(--gt-gold-2);
+  --bs-primary-rgb: var(--gt-gold-2-rgb);
+  --bs-primary-light: rgba(230, 173, 31, 0.14);
+  --bs-link-color: var(--gt-gold-2);
+  --bs-link-color-rgb: var(--gt-gold-2-rgb);
+  --bs-link-hover-color: var(--gt-gold-1);
+  --dt-row-selected: 230, 173, 31;
+}
+[data-pc-preset=preset-8] .bg-light-primary {
+  background: rgba(230, 173, 31, 0.14);
+  color: var(--gt-gold-2);
+}
+[data-pc-preset=preset-8] .link-primary {
+  color: var(--gt-gold-2) !important;
+}
+[data-pc-preset=preset-8] .link-primary:hover, [data-pc-preset=preset-8] .link-primary:focus {
+  color: var(--gt-gold-1) !important;
+}
+[data-pc-preset=preset-8] .btn-primary {
+  --bs-btn-color: #0d0b07;
+  --bs-btn-bg: var(--gt-gold-2);
+  --bs-btn-border-color: var(--gt-gold-2);
+  --bs-btn-hover-color: #0d0b07;
+  --bs-btn-hover-bg: var(--gt-gold-1);
+  --bs-btn-hover-border-color: var(--gt-gold-1);
+  --bs-btn-focus-shadow-rgb: 230, 173, 31;
+  --bs-btn-active-color: #0d0b07;
+  --bs-btn-active-bg: var(--gt-gold-3);
+  --bs-btn-active-border-color: var(--gt-gold-3);
+  --bs-btn-active-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.3);
+  --bs-btn-disabled-color: #0d0b07;
+  --bs-btn-disabled-bg: var(--gt-gold-2);
+  --bs-btn-disabled-border-color: var(--gt-gold-2);
+}
+[data-pc-preset=preset-8] .btn-link {
+  --bs-btn-color: var(--gt-gold-2);
+  --bs-btn-hover-color: var(--gt-gold-1);
+  --bs-btn-active-color: var(--gt-gold-1);
+}
+[data-pc-preset=preset-8] .text-bg-primary {
+  color: #0d0b07 !important;
+  background-color: RGBA(230, 173, 31, var(--bs-bg-opacity, 1)) !important;
+}
+[data-pc-preset=preset-8] .accordion {
+  --bs-accordion-btn-focus-border-color: var(--gt-gold-2);
+  --bs-accordion-btn-focus-box-shadow: 0 0 0 0.2rem rgba(230, 173, 31, 0.25);
+  --bs-accordion-active-color: var(--gt-gold-2);
+  --bs-accordion-active-bg: rgba(230, 173, 31, 0.12);
+}
+[data-pc-preset=preset-8] .alert-primary {
+  --bs-alert-color: var(--gt-gold-1);
+  --bs-alert-bg: rgba(230, 173, 31, 0.14);
+  --bs-alert-border-color: rgba(230, 173, 31, 0.3);
+  --bs-alert-link-color: var(--gt-gold-1);
+}
+[data-pc-preset=preset-8] .list-group {
+  --bs-list-group-active-bg: var(--gt-gold-2);
+  --bs-list-group-active-border-color: var(--gt-gold-2);
+}
+[data-pc-preset=preset-8] .list-group-item-primary {
+  color: var(--gt-gold-1);
+  background-color: rgba(230, 173, 31, 0.14);
+}
+[data-pc-preset=preset-8] .nav {
+  --bs-nav-link-hover-color: var(--gt-gold-1);
+}
+[data-pc-preset=preset-8] .nav-pills {
+  --bs-nav-pills-link-active-bg: var(--gt-gold-2);
+}
+[data-pc-preset=preset-8] .pagination {
+  --bs-pagination-hover-color: var(--gt-gold-1);
+  --bs-pagination-focus-color: var(--gt-gold-1);
+  --bs-pagination-focus-box-shadow: 0 0 0 0.2rem rgba(230, 173, 31, 0.25);
+  --bs-pagination-active-bg: var(--gt-gold-2);
+  --bs-pagination-active-border-color: var(--gt-gold-2);
+}
+[data-pc-preset=preset-8] .progress {
+  --bs-progress-bar-bg: var(--gt-gold-2);
+}
+[data-pc-preset=preset-8] .form-check .form-check-input.input-primary:checked {
+  border-color: var(--gt-gold-2);
+  background-color: var(--gt-gold-2);
+}
+[data-pc-preset=preset-8] .btn-light-primary {
+  background: rgba(230, 173, 31, 0.14);
+  color: var(--gt-gold-2);
+  border-color: rgba(230, 173, 31, 0.14);
+}
+[data-pc-preset=preset-8] .btn-light-primary:hover,
+[data-pc-preset=preset-8] .btn-light-primary.focus,
+[data-pc-preset=preset-8] .btn-light-primary:focus,
+[data-pc-preset=preset-8] .btn-light-primary:not(:disabled):not(.disabled).active,
+[data-pc-preset=preset-8] .btn-light-primary:not(:disabled):not(.disabled):active {
+  background: var(--gt-gold-2);
+  color: #0d0b07;
+  border-color: var(--gt-gold-2);
+}
+[data-pc-preset=preset-8] .table-primary {
+  --bs-table-color: #0d0b07;
+  --bs-table-bg: var(--gt-gold-2);
+  --bs-table-border-color: var(--gt-gold-3);
+  --bs-table-striped-bg: var(--gt-gold-3);
+  --bs-table-striped-color: #0d0b07;
+  --bs-table-active-bg: var(--gt-gold-3);
+  --bs-table-active-color: #0d0b07;
+  --bs-table-hover-bg: var(--gt-gold-3);
+  --bs-table-hover-color: #0d0b07;
+}
+
+/* ==========================================================================
+   Cards, tables, forms, badges, scrollbar, sidebar-user-card, misc
+   ========================================================================== */
+.card {
+  --bs-card-border-color: var(--gt-card-border);
+  --bs-card-box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(230, 173, 31, 0.06);
+  --bs-card-bg: var(--gt-card-bg);
+}
+
+.table {
+  --bs-table-color: var(--gt-text);
+  --bs-table-bg: transparent;
+  --bs-table-border-color: var(--gt-border);
+  --bs-table-striped-bg: rgba(255, 255, 255, 0.02);
+  --bs-table-hover-bg: rgba(230, 173, 31, 0.06);
+}
+thead, .table thead th {
+  color: var(--gt-heading);
+  border-bottom-color: var(--gt-border-light) !important;
+}
+
+.form-control, .datatable-input, .custom-select, .dataTable-selector, .dataTable-input,
+.form-select {
+  color: var(--gt-text);
+  background-color: var(--gt-bg-elevated);
+  border-color: var(--gt-border);
+}
+.form-control:focus, .datatable-input:focus, .custom-select:focus,
+.dataTable-selector:focus, .dataTable-input:focus, .form-select:focus {
+  color: var(--gt-text);
+  background-color: var(--gt-bg-elevated);
+  border-color: var(--gt-gold-2);
+  box-shadow: 0 0 0 0.2rem rgba(230, 173, 31, 0.25);
+}
+.form-control::placeholder, .datatable-input::placeholder {
+  color: var(--gt-text-muted);
+}
+.form-floating > label {
+  color: var(--gt-text-muted);
+}
+
+/* Form-floating — vendor bakes light-theme colors: input text #131920,
+   white pill behind the floated label, dark floated-label color */
+.form-floating > input {
+  color: var(--gt-text);
+}
+.form-floating > .form-control:focus ~ label::after,
+.form-floating > .form-control:not(:placeholder-shown) ~ label::after,
+.form-floating > .datatable-input:focus ~ label::after,
+.form-floating > .datatable-input:not(:placeholder-shown) ~ label::after,
+.form-floating > .custom-select:not(:placeholder-shown) ~ label::after,
+.form-floating > .dataTable-selector:not(:placeholder-shown) ~ label::after,
+.form-floating > .dataTable-input:not(:placeholder-shown) ~ label::after,
+.form-floating > .form-control-plaintext ~ label::after,
+.form-floating > .form-select ~ label::after,
+.form-floating > .datatable-selector ~ label::after {
+  background-color: transparent;
+}
+.form-floating > .form-control:not(:-moz-placeholder-shown) ~ label::after {
+  background-color: transparent;
+}
+.form-floating > :disabled ~ label::after,
+.form-floating > .form-control:disabled ~ label::after {
+  background-color: transparent;
+}
+.form-floating > .form-control:focus ~ label,
+.form-floating > .form-control:not(:placeholder-shown) ~ label,
+.form-floating > .datatable-input:focus ~ label,
+.form-floating > .datatable-input:not(:placeholder-shown) ~ label,
+.form-floating > .form-select ~ label {
+  color: var(--gt-gold-2);
+}
+.form-floating > .form-control:not(:-moz-placeholder-shown) ~ label {
+  color: var(--gt-gold-2);
+}
+
+/* Input hover — vendor hardcodes #f8f9fa (near-white) */
+select.form-control:hover,
+.form-control:hover,
+.datatable-input:hover,
+.custom-select:hover,
+.dataTable-selector:hover,
+.dataTable-input:hover {
+  background-color: #1e1912;
+  border-color: var(--gt-border-light);
+}
+
+/* Native selects — vendor hardcodes white bg + dark chevron icon */
+select.form-control, select.datatable-input, select.custom-select,
+select.dataTable-selector,
+select.dataTable-input {
+  background: var(--gt-bg-elevated) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' stroke='%239c9488' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 0.75rem center/18px 25px;
+}
+.form-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%239c9488' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3E%3C/svg%3E");
+}
+select.form-control option,
+.form-select option {
+  background-color: var(--gt-bg-elevated);
+  color: var(--gt-text);
+}
+
+/* Browser autofill forces white bg + dark text — repaint for dark theme */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--gt-bg-elevated) inset;
+  -webkit-text-fill-color: var(--gt-text);
+  caret-color: var(--gt-text);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* List groups — vendor CSS bakes white bg + light-theme colors into .list-group vars */
+.list-group {
+  --bs-list-group-color: var(--gt-text);
+  --bs-list-group-bg: transparent;
+  --bs-list-group-border-color: var(--gt-border);
+  --bs-list-group-action-color: var(--gt-text);
+  --bs-list-group-action-hover-color: var(--gt-gold-1);
+  --bs-list-group-action-hover-bg: rgba(230, 173, 31, 0.08);
+  --bs-list-group-action-active-color: var(--gt-gold-1);
+  --bs-list-group-action-active-bg: rgba(230, 173, 31, 0.12);
+  --bs-list-group-disabled-color: var(--gt-text-muted);
+  --bs-list-group-disabled-bg: transparent;
+  --bs-list-group-active-color: #0d0b07;
+}
+
+.text-muted {
+  color: var(--gt-text-muted) !important;
+}
+
+.progress {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Gold bg-primary cards: dark text instead of white-on-gold */
+.card.bg-primary {
+  color: #0d0b07;
+}
+.card.bg-primary .text-white {
+  color: #0d0b07 !important;
+}
+
+.bg-light-primary { background: rgba(230, 173, 31, 0.14); color: var(--gt-gold-2); }
+.bg-light-success { background: rgba(47, 191, 113, 0.14); color: var(--gt-success); }
+.bg-light-info { background: rgba(77, 171, 247, 0.14); color: var(--gt-info); }
+.bg-light-warning { background: rgba(245, 166, 35, 0.14); color: var(--gt-warning); }
+.bg-light-danger { background: rgba(229, 72, 77, 0.14); color: var(--gt-danger); }
+
+.badge.bg-light-primary { background: rgba(230, 173, 31, 0.18); color: var(--gt-gold-2); }
+.badge.bg-light-success { background: rgba(47, 191, 113, 0.18); color: var(--gt-success); }
+.badge.bg-light-info { background: rgba(77, 171, 247, 0.18); color: var(--gt-info); }
+.badge.bg-light-warning { background: rgba(245, 166, 35, 0.18); color: var(--gt-warning); }
+.badge.bg-light-danger { background: rgba(229, 72, 77, 0.18); color: var(--gt-danger); }
+
+.simplebar-scrollbar:before {
+  background: var(--gt-gold-3);
+}
+
+.pc-sidebar .card.pc-user-card {
+  border: 1px solid var(--gt-border);
+}
+
+.avtar.avtar-s.border {
+  border-color: var(--gt-border) !important;
+  color: var(--gt-text);
+}
+
+.dropdown-menu {
+  background-color: var(--gt-card-bg);
+  border-color: var(--gt-border);
+  color: var(--gt-text);
+}
+.dropdown-item {
+  color: var(--gt-text);
+}
+.dropdown-item:hover, .dropdown-item:focus {
+  background-color: rgba(230, 173, 31, 0.12);
+  color: var(--gt-gold-1);
+}
+
+.loader-bg {
+  background: var(--gt-bg);
+}
+
+/* ==========================================================================
+   Typography
+   ========================================================================== */
+h1, .h1, h2, .h2, h3, .h3, h4, .h4, h5, .h5, h6, .h6 {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--gt-heading);
+}
+
+.gt-gold-heading {
+  background: linear-gradient(90deg, var(--gt-gold-1), var(--gt-gold-2) 55%, var(--gt-gold-3));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ==========================================================================
+   Brand logo component (assets/images/brand-logo.png)
+   ========================================================================== */
+.gt-logo {
+  color: var(--gt-gold-2);
+}
+.gt-logo-img {
+  height: 52px;
+  width: auto;
+  filter: drop-shadow(0 2px 10px rgba(230, 173, 31, 0.35));
+}
+/* Larger brand mark on auth pages (sign-in / sign-up / forgot password) */
+.auth-main .gt-logo-img {
+  height: 96px;
+}
+.gt-logo-icon {
+  color: var(--gt-gold-2);
+  flex-shrink: 0;
+}
+.gt-logo-text {
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  font-size: 1.15rem;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.gt-logo-text strong {
+  font-weight: 800;
+}
+
+/* ==========================================================================
+   Utility card variants
+   ========================================================================== */
+.card-gold {
+  background: linear-gradient(135deg, var(--gt-gold-3), var(--gt-gold-2)) !important;
+  border: none !important;
+}
+.card-gold-outline {
+  background: var(--gt-card-bg) !important;
+  border: 1px solid rgba(230, 173, 31, 0.35) !important;
+}
+
+.gt-coin-icon {
+  color: var(--gt-gold-2);
+  width: 35px;
+  height: 35px;
+}
+
+/* Auth pages */
+.auth-main .card {
+  border: 1px solid var(--gt-border);
+}
+.saprator {
+  color: var(--gt-text-muted);
+}
+.saprator span {
+  background: var(--gt-card-bg);
+}
