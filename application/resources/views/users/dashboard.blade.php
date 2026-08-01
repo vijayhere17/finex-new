@@ -197,8 +197,14 @@
             </div>
             <div class="col-6 col-md-4 col-xl-3">
                 <div class="card fx-stat-card mb-0"><div class="card-body">
-                    <div class="fx-label">Total ROI</div>
+                    <div class="fx-label">Total ROI Generated</div>
                     <p class="fx-value">${{ number_format($fx->total_roi, 2) }}</p>
+                </div></div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-3">
+                <div class="card fx-stat-card mb-0"><div class="card-body">
+                    <div class="fx-label">Unlocked ROI</div>
+                    <p class="fx-value text-gold">${{ number_format($fx->unlocked_roi ?? 0, 2) }}</p>
                 </div></div>
             </div>
             <div class="col-6 col-md-4 col-xl-3">
@@ -209,14 +215,26 @@
             </div>
             <div class="col-6 col-md-4 col-xl-3">
                 <div class="card fx-stat-card mb-0"><div class="card-body">
-                    <div class="fx-label">Auto Upgrade Wallet</div>
+                    <div class="fx-label">Sponsor Wallet Total</div>
+                    <p class="fx-value">${{ number_format($fx->sponsor_wallet_total ?? 0, 2) }}</p>
+                </div></div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-3">
+                <div class="card fx-stat-card mb-0"><div class="card-body">
+                    <div class="fx-label">Auto Upgrade Used</div>
+                    <p class="fx-value">${{ number_format($fx->auto_upgrade_used ?? 0, 2) }}</p>
+                </div></div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-3">
+                <div class="card fx-stat-card mb-0"><div class="card-body">
+                    <div class="fx-label">Available Sponsor Balance</div>
                     <p class="fx-value text-gold">${{ number_format($fx->auto_upgrade_balance, 2) }}</p>
                 </div></div>
             </div>
             <div class="col-6 col-md-4 col-xl-3">
                 <div class="card fx-stat-card mb-0"><div class="card-body">
-                    <div class="fx-label">Available Wallet</div>
-                    <p class="fx-value">${{ number_format($fx->available_wallet, 2) }}</p>
+                    <div class="fx-label">Withdrawable Wallet</div>
+                    <p class="fx-value">${{ number_format($fx->withdrawable_wallet ?? $fx->available_wallet, 2) }}</p>
                 </div></div>
             </div>
             <div class="col-6 col-md-4 col-xl-3">

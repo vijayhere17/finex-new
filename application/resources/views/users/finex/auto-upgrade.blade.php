@@ -3,7 +3,12 @@
 <div class="pc-container"><div class="pc-content">
     <div class="page-header mb-3">
         <h2 class="mb-0">{{ $page_titel }}</h2>
-        <p class="text-muted mb-0">Balance: <strong>${{ number_format($balance, 2) }}</strong> — credits from 2nd &amp; 3rd directs auto-buy your next slot.</p>
+        <p class="text-muted mb-0">Credits from 2nd &amp; 3rd directs auto-buy your next slot. Sponsor Wallet tracks total business separately.</p>
+        <div class="row g-2 mt-2">
+            <div class="col-md-4"><div class="border rounded p-2">Total Business: <strong>${{ number_format($sponsorWallet['total'] ?? 0, 2) }}</strong></div></div>
+            <div class="col-md-4"><div class="border rounded p-2">Auto Upgrade Used: <strong>${{ number_format($sponsorWallet['auto_upgrade_used'] ?? 0, 2) }}</strong></div></div>
+            <div class="col-md-4"><div class="border rounded p-2">Available: <strong>${{ number_format($sponsorWallet['available'] ?? $balance, 2) }}</strong></div></div>
+        </div>
     </div>
     <div class="card"><div class="card-body table-responsive">
         <table class="table table-striped table-hover align-middle mb-0">

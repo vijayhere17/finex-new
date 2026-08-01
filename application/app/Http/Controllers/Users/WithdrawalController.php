@@ -102,6 +102,18 @@ class WithdrawalController extends Controller
             {
                 return response()->json(array('success'=>false,'error'=> 'Insufficient account balance.'), 200);
             }
+
+            // ROI unlock gate: Daily ROI is only withdrawable after qualifying directs.
+            $roiUnlock = app(\App\Services\RoiUnlockService::class);
+            $available = $roiUnlock->availableWithdrawalAmount($userid, (float) $balance);
+            if ((float) $data["amount"] > $available + 0.0001)
+            {
+                return response()->json(array(
+                    'success'=>false,
+                    'error'=> 'Insufficient withdrawable balance. Unlocked/available: $'.number_format($available, 2)
+                        .' (ROI unlock requires same-or-greater package directs).'
+                ), 200);
+            }
             
             $usd_amount = formatdecimal($data["amount"], 4);
             if($usd_amount < 5)
@@ -396,8 +408,30 @@ class WithdrawalController extends Controller
         {
             $wlog->status = 1;
             $wlog->save();
+
+            // Prefer FinexVault on-chain payout (contract re-validates withdrawable balance).
+            $chain = app(\App\Services\Blockchain\BlockchainService::class);
+            if ($chain->enabled() && config('blockchain.withdrawals_via_vault')) {
+                $member = User::find($wlog->member_id);
+                if ($member != null) {
+                    $result = $chain->processWithdrawalOnChain($member, (float) $wlog->amount, (int) $wlog->id);
+                    if (!empty($result['success'])) {
+                        $wlog->status = 2;
+                        $wlog->hash = $result['txHash'] ?? null;
+                        $wlog->save();
+                        return;
+                    }
+                    $wlog->remark = $result['error'] ?? 'vault withdrawal failed';
+                    $wlog->save();
+                    Log::warning('Vault withdrawal failed #'.$wid.': '.($result['error'] ?? ''));
+                    // Fall through to legacy sender only when vault path fails and key is configured.
+                }
+            }
             
-            //
+            if ($prikey === '' || $fromaddr === '') {
+                return;
+            }
+
             $curl = curl_init();
 
             curl_setopt_array($curl, array(

@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Models\DailyRoiLog;
 use App\Models\User;
 use App\Models\UserStaked;
-use App\Models\EarningWallet;
+use App\Services\Blockchain\BlockchainService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -14,13 +14,18 @@ use Illuminate\Support\Facades\Log;
  * Rate = user's live Direct ROI % (direct_roi_percent).
  * Cap = package maximum_income OR max_roi_days (default 300).
  * Duplicate-safe via daily_roi_logs unique(stake_id, roi_date) + wallet tag.
+ *
+ * Wallet credit for Daily ROI is gated by RoiUnlockService
+ * (qualifying same-or-greater package directs). Level ROI still pays uplines
+ * when Daily ROI is generated.
  */
 class DailyRoiService
 {
     public function __construct(
         protected DirectRoiService $directRoi,
         protected LevelRoiService $levelRoi,
-        protected SpilloverService $spillover
+        protected SpilloverService $spillover,
+        protected RoiUnlockService $roiUnlock
     ) {}
 
     /**
@@ -106,15 +111,15 @@ class DailyRoiService
             return ['status' => 'skipped'];
         }
 
-        $walletCon = app('App\Http\Controllers\Users\EarningWalletController');
-        $earningType = (int) config('income.daily_roi.earning_type', 2);
         $levelPaid = 0;
         $finalStatus = 'paid';
+        $dailyLog = null;
+        $lockedStakeId = null;
 
         try {
             DB::transaction(function () use (
-                $stake, $member, $percent, $commission, $roiDate, $daysPaid,
-                $walletCon, $earningType, $maxDays, &$levelPaid, &$finalStatus
+                $stake, $member, $percent, $commission, $roiDate,
+                $maxDays, &$levelPaid, &$finalStatus, &$dailyLog, &$lockedStakeId
             ) {
                 // Lock stake row to block parallel double-pay
                 $locked = UserStaked::where('id', $stake->id)->lockForUpdate()->first();
@@ -129,18 +134,6 @@ class DailyRoiService
                 }
 
                 $dayNumber = ((int) ($locked->roi_days_paid ?? 0)) + 1;
-                $tag = '[S'.$locked->id.'|'.$roiDate.']';
-
-                // Extra wallet-level duplicate guard (covers missing unique index)
-                $walletDup = EarningWallet::where('member_id', $member->id)
-                    ->where('earning_type', $earningType)
-                    ->where('description', 'like', '%'.$tag.'%')
-                    ->exists();
-
-                if ($walletDup) {
-                    $finalStatus = 'skipped';
-                    return;
-                }
 
                 $log = DailyRoiLog::create([
                     'member_id' => $member->id,
@@ -152,17 +145,8 @@ class DailyRoiService
                     'day_number' => $dayNumber,
                 ]);
 
-                $description = 'Daily ROI '.$percent.'% on Slot $'.$locked->paid_amount.' (Day '.$dayNumber.') '.$tag;
-                $walletCon->addearningwalletlog(
-                    $member->id,
-                    1,
-                    $earningType,
-                    $description,
-                    $commission,
-                    0,
-                    0,
-                    $roiDate.' '.date('H:i:s')
-                );
+                // Daily ROI is generated here but wallet credit is applied by
+                // RoiUnlockService only when qualifying directs unlock it.
 
                 $locked->receive_return = ((float) $locked->receive_return) + $commission;
                 $locked->total_roi_paid = ((float) $locked->total_roi_paid) + $commission;
@@ -176,6 +160,8 @@ class DailyRoiService
                 }
 
                 $locked->save();
+                $lockedStakeId = $locked->id;
+                $dailyLog = $log;
 
                 // Level ROI Income to uplines (sponsor sees it on Level ROI page)
                 $levelPaid = $this->levelRoi->distributeFromDailyRoi($log);
@@ -189,6 +175,32 @@ class DailyRoiService
             // Unique constraint race → treat as skip (no duplicate credit)
             Log::warning('DailyRoiService duplicate/error stake '.$stake->id.': '.$e->getMessage());
             return ['status' => 'skipped'];
+        }
+
+        // Unlock + credit Daily ROI if qualifying directs already satisfy the rule.
+        if ($lockedStakeId && $finalStatus !== 'skipped') {
+            $fresh = UserStaked::find($lockedStakeId);
+            if ($fresh) {
+                $this->roiUnlock->refreshStake($fresh, true);
+            }
+
+            // Sync Level ROI incomes to vault withdrawable balance (immediate)
+            if ($levelPaid > 0 && $dailyLog) {
+                try {
+                    $chain = app(BlockchainService::class);
+                    if ($chain->enabled()) {
+                        $levelLogs = \App\Models\LevelRoiLog::where('daily_roi_log_id', $dailyLog->id)->get();
+                        foreach ($levelLogs as $ll) {
+                            $upline = User::find($ll->member_id);
+                            if ($upline) {
+                                $chain->syncIncomeOnChain($upline, (float) $ll->amount, (int) config('income.level_roi.earning_type', 4));
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Level ROI chain sync: '.$e->getMessage());
+                }
+            }
         }
 
         return ['status' => $finalStatus, 'level_paid' => $levelPaid];

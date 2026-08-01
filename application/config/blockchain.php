@@ -1,0 +1,60 @@
+<?php
+
+/**
+ * Finex on-chain vault configuration (BSC Testnet by default).
+ * Laravel remains the management layer; FinexVault holds USDT.
+ */
+
+$deploymentFile = storage_path('app/blockchain/FinexVault.json');
+$deployment = is_file($deploymentFile)
+    ? json_decode((string) file_get_contents($deploymentFile), true)
+    : [];
+
+$abiFile = base_path('blockchain/abi/FinexVault.json');
+$abiPayload = is_file($abiFile)
+    ? json_decode((string) file_get_contents($abiFile), true)
+    : $deployment;
+
+return [
+
+    'enabled' => (bool) env('BLOCKCHAIN_ENABLED', true),
+
+    // 97 = BSC Testnet, 56 = BSC Mainnet
+    'chain_id' => (int) env('BSC_CHAIN_ID', 97),
+
+    'network' => env('BSC_NETWORK', 'bscTestnet'),
+
+    'rpc_url' => env('BSC_TESTNET_RPC', env('BSC_RPC_URL', 'https://data-seed-prebsc-1-s1.binance.org:8545')),
+
+    'explorer_tx_url' => env('BSC_EXPLORER_TX_URL', 'https://testnet.bscscan.com/tx/'),
+
+    // FinexVault address (set after deploy, or via abi/FinexVault.json)
+    'vault_address' => env('FINEX_VAULT_ADDRESS', $abiPayload['address'] ?? ($deployment['address'] ?? '')),
+
+    // USDT used by the vault (MockUSDT on testnet, real USDT on mainnet)
+    'usdt_address' => env(
+        'BLOCKCHAIN_USDT_ADDRESS',
+        $abiPayload['usdt'] ?? ($deployment['usdt'] ?? env('USDT_CONTRACT', '0x55d398326f99059fF775485246999027B3197955'))
+    ),
+
+    // Operator signs syncRoi / processWithdrawal / creditAutoUpgradeBalance
+    'operator_address' => env('BLOCKCHAIN_OPERATOR_ADDRESS', $abiPayload['operator'] ?? ''),
+    'operator_key' => env('BLOCKCHAIN_OPERATOR_KEY', env('WITHDRAWAL_PRIVATE_KEY', '')),
+
+    // Node helper used by Laravel (same pattern as existing txn-details.js)
+    'node_script' => base_path('blockchain/scripts/operator-cli.js'),
+
+    'abi_path' => base_path('blockchain/abi/FinexVault.json'),
+
+    // When true, slot activation requires a real FinexVault.invest() tx (or verified recordInvestment)
+    'require_onchain_invest' => (bool) env('BLOCKCHAIN_REQUIRE_ONCHAIN_INVEST', false),
+
+    // When true, withdrawals are paid from FinexVault instead of external send-edu.php
+    'withdrawals_via_vault' => (bool) env('BLOCKCHAIN_WITHDRAWALS_VIA_VAULT', true),
+
+    // Sync ROI unlock + auto-upgrade credits to the vault after off-chain processing
+    'sync_roi_onchain' => (bool) env('BLOCKCHAIN_SYNC_ROI', true),
+    'sync_auto_upgrade_onchain' => (bool) env('BLOCKCHAIN_SYNC_AUTO_UPGRADE', true),
+
+    'usdt_decimals' => 18,
+];

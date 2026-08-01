@@ -171,6 +171,16 @@ class StakeController extends Controller
 
         $to_address = $this->depositaddress();
 
+        $blockchain = app(\App\Services\Blockchain\BlockchainService::class);
+        $chain = $blockchain->frontendConfig();
+        // When vault is configured, deposits go to FinexVault (not EOA deposit wallet).
+        if (!empty($chain['enabled']) && !empty($chain['vault_address'])) {
+            $to_address = $chain['vault_address'];
+            if (!empty($chain['usdt_address'])) {
+                $usdt_con_addr = $chain['usdt_address'];
+            }
+        }
+
         return view('users.buy-bot')->with([
     'page_titel'=>$page_titel,
     'coin_rate'=>$coin_rate,
@@ -185,6 +195,10 @@ class StakeController extends Controller
     'usdt_con_addr'=>$usdt_con_addr,
     'usdt_con_abi'=>$usdt_con_abi,
     'to_address'=>$to_address,
+    'finex_vault_address'=>$chain['vault_address'] ?? '',
+    'finex_vault_abi'=>$chain['vault_abi'] ?? '[]',
+    'bsc_chain_id'=>$chain['chain_id'] ?? 97,
+    'blockchain_enabled'=>$chain['enabled'] ?? false,
 ])->toJS();
     }
     
@@ -287,18 +301,40 @@ class StakeController extends Controller
 
             if($status == 2)
             {
-                // check transaction hash
-                // $response = Http::withOptions(['verify' => false])->get("https://f5sys.com/dont-delete-bnbnode/tnx-details.php?hash={$hash}");
-                
-                $rpc_url = 'https://bsc-dataseed1.binance.org/';
-                
-                $response = shell_exec("node /home/eudstake/node/txn-details.js ".$hash." ".$rpc_url);
+                $chain = app(\App\Services\Blockchain\BlockchainService::class);
+                $activated = false;
+                $investMeta = null;
 
-                $result = json_decode($response, true);    
+                // Prefer FinexVault Invested-event verification (BSC testnet/mainnet).
+                if ($chain->enabled() && !str_starts_with((string) $hash, 'TEST-') && !str_starts_with((string) $hash, 'TEMP-')) {
+                    $investMeta = $chain->verifyInvestTransaction($hash);
+                    if (!empty($investMeta['verified'])) {
+                        $expectedSlot = (int) ($slotProgress['next_slot'] ?? 0);
+                        $gotSlot = (int) ($investMeta['slotNumber'] ?? 0);
+                        $gotAmount = (float) ($investMeta['packageAmount'] ?? 0);
+                        if ($gotSlot === $expectedSlot && abs($gotAmount - $amountFloat) < 0.0001) {
+                            $activated = true;
+                        }
+                    }
+                }
 
-                if($result["status"])
+                if (!$activated) {
+                    // Legacy fallback: plain USDT transfer verify (mainnet tooling path)
+                    $rpc_url = config('blockchain.rpc_url', 'https://bsc-dataseed1.binance.org/');
+                    $response = shell_exec("node /home/eudstake/node/txn-details.js ".$hash." ".$rpc_url);
+                    $result = json_decode($response, true);
+                    if (!empty($result['status'])) {
+                        $activated = true;
+                    }
+                }
+
+                if ($activated)
                 {
-                    $status = $this->setStakeActivation($object->member_id, $object->stake_id, $object->amount, $object->id);
+                    $stake = $this->setStakeActivation($object->member_id, $object->stake_id, $object->amount, $object->id);
+                    if ($stake && $investMeta) {
+                        $investMeta['txHash'] = $hash;
+                        $chain->attachInvestResult($stake, $investMeta);
+                    }
 
                     return response()->json(array('success'=>true, 'message'=>'Your Stake Successfully!', 'error'=>''), 200);
                 }
@@ -610,13 +646,31 @@ class StakeController extends Controller
             if($refer != null && $refer->kit_id > 0)
             {
                 if (config('income.direct_sponsor_enabled', false)) {
+                    app(\App\Services\AutoUpgradeService::class)
+                        ->creditSponsorWalletTotal($refer, (float) $amount);
                     self::processreferralcommission($refer->id, 1, $amount, $member->id, $kit->id, date("Y-m-d H:i:s"));
                 } else {
                     app(\App\Services\AutoUpgradeService::class)
                         ->creditFromDirectActivation($refer, (int) $member->id, (float) $amount);
                 }
+            } elseif ($refer != null) {
+                // Still track Sponsor Wallet total business even if auto-upgrade pot is skipped.
+                app(\App\Services\AutoUpgradeService::class)
+                    ->creditSponsorWalletTotal($refer, (float) $amount);
+            }
+
+            // ROI unlock: same-or-greater package referral unlocks sponsor withdrawable ROI.
+            if ($refer != null) {
+                try {
+                    app(\App\Services\RoiUnlockService::class)
+                        ->onDirectActivated($refer, $member->fresh(), (float) $amount);
+                } catch (\Throwable $e) {
+                    \Log::warning('ROI unlock on activation: '.$e->getMessage());
+                }
             }
         }
+
+        return $log;
     }
 
     /**

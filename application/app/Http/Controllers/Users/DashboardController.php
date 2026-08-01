@@ -45,6 +45,12 @@ class DashboardController extends Controller
         $amounts = config('income.slot_amounts', []);
         $nextAmount = ($progress['next_slot'] > 0) ? ($amounts[$progress['next_slot'] - 1] ?? 0) : 0;
 
+        $sponsorWallet = app(AutoUpgradeService::class)->getSponsorWalletBreakdown($user);
+        $roiUnlock = app(\App\Services\RoiUnlockService::class);
+        $earningBalance = (float) $balanceCon->getearningbalance($userId);
+        $totalRoiGenerated = (float) UserStaked::where('member_id', $userId)->sum('total_roi_paid');
+        $unlockedRoi = (float) UserStaked::where('member_id', $userId)->sum('unlocked_roi');
+
         $fx = (object) [
             'current_slot' => $progress['current_slot'],
             'next_slot' => $progress['next_slot'],
@@ -53,11 +59,17 @@ class DashboardController extends Controller
             'qualified_active_directs' => $directRoi['qualified_active_directs'],
             'direct_roi_percent' => $directRoi['direct_roi_percent'],
             'today_roi' => (float) DailyRoiLog::where('member_id', $userId)->whereDate('roi_date', today())->sum('amount'),
-            'total_roi' => (float) $balanceCon->getearningsum($userId, 2),
+            'total_roi' => $totalRoiGenerated > 0 ? $totalRoiGenerated : (float) $balanceCon->getearningsum($userId, 2),
+            'unlocked_roi' => $unlockedRoi,
             'level_roi' => (float) $balanceCon->getearningsum($userId, 4),
             'auto_upgrade_balance' => (float) ($user->auto_upgrade_balance ?? 0),
-            'available_wallet' => (float) $balanceCon->getearningbalance($userId),
+            'sponsor_wallet_total' => $sponsorWallet['total'],
+            'auto_upgrade_used' => $sponsorWallet['auto_upgrade_used'],
+            'available_wallet' => $earningBalance,
+            'withdrawable_wallet' => $roiUnlock->availableWithdrawalAmount($userId, $earningBalance),
             'total_withdrawn' => (float) WithdrawalLog::where('member_id', $userId)->where('status', 2)->sum('payable'),
+            'vault_address' => config('blockchain.vault_address'),
+            'blockchain_enabled' => (bool) config('blockchain.enabled'),
         ];
 
         $object = new Dashboarddata;

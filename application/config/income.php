@@ -10,16 +10,18 @@ return [
     // Registration is FREE.
     'registration_fee' => 0,
 
-    // Company receive wallet (slot / deposit USDT goes here)
+    // Company receive wallet (legacy EOA). Prefer FinexVault when blockchain.enabled.
+    // See config/blockchain.php — vault holds user funds on BSC Testnet/Mainnet.
     'deposit_wallet' => env('DEPOSIT_WALLET', '0x4d02Eda4EE50E55D97974D0C7b8647Ea9853B0aE'),
 
-    // Company payout wallet (admin / auto withdrawal sends FROM this address)
+    // Company payout wallet (legacy fallback when vault withdrawals disabled)
     'withdrawal_wallet' => env('WITHDRAWAL_WALLET', '0xE263603Cd83fa6c125D96B007933b70a667759e7'),
 
     // Optional: set only on server .env — never commit a private key to git
     'withdrawal_private_key' => env('WITHDRAWAL_PRIVATE_KEY', ''),
 
-    'usdt_contract' => '0x55d398326f99059fF775485246999027B3197955',
+    // Default mainnet USDT; testnet uses BLOCKCHAIN_USDT_ADDRESS / MockUSDT from deploy
+    'usdt_contract' => env('USDT_CONTRACT', '0x55d398326f99059fF775485246999027B3197955'),
 
     // Fixed sequential slots (Slot 1 .. Slot 12)
     'slot_amounts' => [10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480],

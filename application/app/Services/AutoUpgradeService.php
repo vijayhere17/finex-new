@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AutoUpgradeLog;
 use App\Models\StakeMaster;
 use App\Models\User;
+use App\Services\Blockchain\BlockchainService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -77,9 +78,19 @@ class AutoUpgradeService
                 'from_id' => $fromId,
                 'description' => 'Auto-upgrade credit from Direct #'.$position.': '.$description,
             ]);
-
-            $this->tryActivateNextSlot($user);
         });
+
+        // Sync available sponsor balance to FinexVault before attempting auto-upgrade.
+        try {
+            $from = User::find($fromId);
+            if ($from) {
+                app(BlockchainService::class)->creditAutoUpgradeOnChain($sponsor->fresh(), $from, $amount);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('AutoUpgrade chain credit: '.$e->getMessage());
+        }
+
+        $this->tryActivateNextSlot($sponsor->fresh());
 
         return true;
     }
@@ -87,12 +98,17 @@ class AutoUpgradeService
     /**
      * Finex path (no Direct Sponsor wallet income): credit auto-upgrade pot from
      * 2nd/3rd activated direct using % of the activated slot amount.
+     *
+     * Also increases Sponsor Wallet total business (full package) for dashboard.
      */
     public function creditFromDirectActivation(User $sponsor, int $fromId, float $slotAmount): bool
     {
         if ($slotAmount <= 0) {
             return false;
         }
+
+        // Always track total direct business in Sponsor Wallet (distinct from available pot).
+        $this->creditSponsorWalletTotal($sponsor, $slotAmount);
 
         $position = $this->directActivationPosition((int) $sponsor->id, $fromId);
         $percents = config('income.auto_upgrade.divert_percent_of_slot', [2 => 2, 3 => 1]);
@@ -106,6 +122,47 @@ class AutoUpgradeService
         $description = 'Slot $'.$slotAmount.' activation (Direct #'.$position.')';
 
         return $this->maybeDivertToAutoUpgrade($sponsor, $fromId, $amount, $description);
+    }
+
+    /**
+     * Increase Total Sponsor Wallet (direct business). Does not change available balance.
+     */
+    public function creditSponsorWalletTotal(User $sponsor, float $slotAmount): void
+    {
+        if ($slotAmount <= 0) {
+            return;
+        }
+
+        $user = User::find($sponsor->id);
+        if ($user == null) {
+            return;
+        }
+
+        $user->sponsor_wallet_total = ((float) ($user->sponsor_wallet_total ?? 0)) + $slotAmount;
+        $user->save();
+    }
+
+    /**
+     * Dashboard breakdown: Total Business / Auto Upgrade Used / Available.
+     */
+    public function getSponsorWalletBreakdown(User $user): array
+    {
+        $available = (float) ($user->auto_upgrade_balance ?? 0);
+        $used = (float) ($user->auto_upgrade_used ?? 0);
+        $total = (float) ($user->sponsor_wallet_total ?? 0);
+
+        // Fallback: derive used from activate logs if column was empty historically
+        if ($used <= 0) {
+            $used = (float) AutoUpgradeLog::where('member_id', $user->id)
+                ->where('event_type', 'activate')
+                ->sum('amount');
+        }
+
+        return [
+            'total' => $total,
+            'auto_upgrade_used' => $used,
+            'available' => $available,
+        ];
     }
 
     protected static $activating = false;
@@ -160,6 +217,7 @@ class AutoUpgradeService
                 }
 
                 $locked->auto_upgrade_balance = ((float) $locked->auto_upgrade_balance) - $price;
+                $locked->auto_upgrade_used = ((float) ($locked->auto_upgrade_used ?? 0)) + $price;
                 $locked->current_slot = $nextSlot;
                 $locked->next_slot = ($nextSlot < 12) ? ($nextSlot + 1) : 0;
                 $locked->save();
@@ -178,6 +236,13 @@ class AutoUpgradeService
 
                 $this->payUplineUpgradeIncome($locked, $nextSlot, $price);
             });
+
+            // Ensure vault slot matches (usually already auto-upgraded when balance was credited).
+            try {
+                app(BlockchainService::class)->autoUpgradeOnChain($user->fresh(), 0);
+            } catch (\Throwable $e) {
+                Log::warning('AutoUpgrade chain activate: '.$e->getMessage());
+            }
         } finally {
             self::$activating = false;
         }
@@ -216,6 +281,12 @@ class AutoUpgradeService
                         'from_id' => $member->id,
                         'description' => $desc,
                     ]);
+
+                    try {
+                        app(BlockchainService::class)->syncIncomeOnChain($upline, $commission, $earningType);
+                    } catch (\Throwable $e) {
+                        Log::warning('AutoUpgrade income chain sync: '.$e->getMessage());
+                    }
                 }
             }
 

@@ -362,7 +362,20 @@ window.slotMeta = {
     direct_roi_percent: {{ (float) $direct_roi_percent }}
 };
 </script>
-<script src="{{ URL::to('/') }}/assets/js/users/buy-bot.0.16.js?v=3"></script>
+<script>
+@php
+    $sponsorWalletJs = '0x0000000000000000000000000000000000000000';
+    $authUser = auth()->user();
+    if ($authUser && $authUser->referral_id) {
+        $sponsorUser = \App\Models\User::find($authUser->referral_id);
+        if ($sponsorUser && $sponsorUser->username) {
+            $sponsorWalletJs = explode('-', $sponsorUser->username)[0];
+        }
+    }
+@endphp
+window.sponsorWalletAddress = @json($sponsorWalletJs);
+</script>
+<script src="{{ URL::to('/') }}/assets/js/users/buy-bot.0.17.js?v=1"></script>
 <script>
     connectwallet();
 

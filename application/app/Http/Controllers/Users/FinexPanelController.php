@@ -57,8 +57,9 @@ class FinexPanelController extends Controller
         $user = Auth::user();
         $rows = AutoUpgradeLog::where('member_id', $user->id)->orderBy('id', 'desc')->paginate(50);
         $balance = (float) ($user->auto_upgrade_balance ?? 0);
+        $sponsorWallet = app(\App\Services\AutoUpgradeService::class)->getSponsorWalletBreakdown($user);
 
-        return view('users.finex.auto-upgrade', compact('page_titel', 'rows', 'balance'));
+        return view('users.finex.auto-upgrade', compact('page_titel', 'rows', 'balance', 'sponsorWallet'));
     }
 
     public function transactions()
