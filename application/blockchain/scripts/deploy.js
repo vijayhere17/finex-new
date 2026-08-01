@@ -5,6 +5,18 @@ const hre = require('hardhat');
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
   const network = hre.network.name;
+
+  if (!deployer) {
+    throw new Error(
+      'No deployer account for network "' + network + '".\n' +
+      'Set BLOCKCHAIN_OPERATOR_KEY in application/.env or blockchain/.env\n' +
+      '  BLOCKCHAIN_OPERATOR_KEY=0xYOUR_64_CHAR_PRIVATE_KEY\n' +
+      'Or in PowerShell for this session:\n' +
+      '  $env:BLOCKCHAIN_OPERATOR_KEY = "0xYOUR_PRIVATE_KEY"\n' +
+      'The wallet must have BSC testnet BNB for gas.'
+    );
+  }
+
   console.log('Deploying Finex vault with', deployer.address, 'on', network);
 
   const balance = await hre.ethers.provider.getBalance(deployer.address);
