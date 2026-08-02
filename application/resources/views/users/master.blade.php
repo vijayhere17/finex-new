@@ -429,7 +429,13 @@
     <script src="{{ URL::to('/') }}/assets/common/js/ethers-v4.min.js"></script>
     
     <script src="{{ URL::to('/') }}/assets/common/js/jquery.blockUI.js"></script>
-    <script src="{{ URL::to('/') }}/assets/common/js/common.0.8.js"></script>
+    <script>
+        // Finex BSC network defaults for wallet connect (testnet=97, mainnet=56)
+        window.bscChainId = {{ (int) config('blockchain.chain_id', 97) }};
+        window.finexUsdtAddress = @json(config('blockchain.usdt_address', ''));
+        window.finexVaultAddress = @json(config('blockchain.vault_address', ''));
+    </script>
+    <script src="{{ URL::to('/') }}/assets/common/js/common.0.9.js?v=1"></script>
 
     @yield('jscontent')
 </body>

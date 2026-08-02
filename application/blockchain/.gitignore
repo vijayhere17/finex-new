@@ -7,3 +7,4 @@ typechain/
 typechain-types/
 .env
 *.log
+abi/deployed.*.json

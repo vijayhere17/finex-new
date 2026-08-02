@@ -375,9 +375,16 @@ window.slotMeta = {
 @endphp
 window.sponsorWalletAddress = @json($sponsorWalletJs);
 </script>
-<script src="{{ URL::to('/') }}/assets/js/users/buy-bot.0.17.js?v=2"></script>
+<script src="{{ URL::to('/') }}/assets/js/users/buy-bot.0.17.js?v=3"></script>
 <script>
-    connectwallet();
+    // Sync chain/USDT for wallet helper before optional connect
+    window.bscChainId = {{ (int) ($bsc_chain_id ?? config('blockchain.chain_id', 97)) }};
+    window.finexUsdtAddress = @json($usdt_con_addr ?? '');
+
+    // Soft-connect wallet (errors are swallowed — Activate will connect again)
+    if (typeof connectwallet === 'function') {
+        connectwallet();
+    }
 
     // Pre-select the next eligible slot radio (if available).
     (function () {
