@@ -188,7 +188,7 @@
         <!-- Hero -->
         <div class="slot-hero">
             <h2>Slot Activation</h2>
-            <p>Choose your next eligible slot to activate.</p>
+            <p>Pay instantly with your wallet — USDT goes to the Finex smart contract. No admin approval.</p>
         </div>
 
         <!-- Progress Section -->
@@ -375,7 +375,7 @@ window.slotMeta = {
 @endphp
 window.sponsorWalletAddress = @json($sponsorWalletJs);
 </script>
-<script src="{{ URL::to('/') }}/assets/js/users/buy-bot.0.17.js?v=1"></script>
+<script src="{{ URL::to('/') }}/assets/js/users/buy-bot.0.17.js?v=2"></script>
 <script>
     connectwallet();
 

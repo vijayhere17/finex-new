@@ -64,7 +64,9 @@ npx hardhat test
 ## Frontend
 
 Slot activation JS: `assets/js/users/buy-bot.0.17.js`  
-When `blockchain_enabled` + vault address are present, MetaMask calls `approve` + `FinexVault.invest` instead of transferring USDT to an EOA.
+
+**Instant buy (no admin approval):** clicking Activate opens MetaMask → `USDT.approve` → `FinexVault.invest`.  
+Laravel verifies the `Invested` event and activates the slot immediately. Pending/admin-approval topups are rejected.
 
 ## Mainnet
 
