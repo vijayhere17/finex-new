@@ -43,7 +43,7 @@
                         $bg = $loop->even ? 'rgba(248,206,78,0.07)' : 'transparent';
                     @endphp
                     <tr style="background:{{ $bg }};border-bottom:1px solid #2e2920;color:#f6efdd;">
-                        <td style="padding:0.75rem;color:#f6efdd;">{{ $row->id }}</td>
+                        <td style="padding:0.75rem;color:#f6efdd;">{{ $loop->iteration }}</td>
                         <td style="padding:0.75rem;color:#f6efdd;font-weight:700;">{{ $slotNo ? 'Slot '.$slotNo : '—' }}</td>
                         <td style="padding:0.75rem;color:#f8ce4e;">${{ number_format((float) $row->paid_amount, 2) }}</td>
                         <td style="padding:0.75rem;color:#f6efdd;">${{ number_format((float) ($row->total_roi_paid ?? 0), 2) }}</td>
