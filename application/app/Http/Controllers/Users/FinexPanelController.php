@@ -24,7 +24,11 @@ class FinexPanelController extends Controller
     {
         $page_titel = 'My Slots';
         $userId = Auth::id();
-        $slots = UserStaked::where('member_id', $userId)->orderBy('id', 'desc')->get();
+
+        // Full activation history (do not hide completed / duplicate slot rows).
+        $slots = UserStaked::where('member_id', $userId)
+            ->orderBy('id', 'desc')
+            ->get();
 
         return view('users.finex.my-slots', compact('page_titel', 'slots'));
     }
