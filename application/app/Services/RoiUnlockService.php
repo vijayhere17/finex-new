@@ -166,17 +166,19 @@ class RoiUnlockService
         }
 
         // Also refresh completed stakes that still have locked ROI uncredited
-        $closed = UserStaked::where('member_id', $sponsor->id)
-            ->where('is_deleted', 1)
-            ->whereColumn('unlocked_roi', '<', 'total_roi_paid')
-            ->orderBy('id')
-            ->get();
+        if (\Illuminate\Support\Facades\Schema::hasColumn('staked_users', 'unlocked_roi')) {
+            $closed = UserStaked::where('member_id', $sponsor->id)
+                ->where('is_deleted', 1)
+                ->whereColumn('unlocked_roi', '<', 'total_roi_paid')
+                ->orderBy('id')
+                ->get();
 
-        foreach ($closed as $stake) {
-            if ($directPackageAmount + 0.00001 < (float) $stake->paid_amount) {
-                continue;
+            foreach ($closed as $stake) {
+                if ($directPackageAmount + 0.00001 < (float) $stake->paid_amount) {
+                    continue;
+                }
+                $this->refreshStake($stake, true);
             }
-            $this->refreshStake($stake, true);
         }
     }
 
