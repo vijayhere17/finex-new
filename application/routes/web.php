@@ -129,6 +129,7 @@ Route::group(['middleware' => 'auth'], function ()
         Route::get('buy-robo', 'buyRobo')->name('buy-robo');
 
         Route::post('process-submit-buy-bot','submitBotTxn');
+        Route::post('sync-chain-slots', 'syncChainSlots');
         
         Route::post('process-submit-capital-withdrawal','capitalWithdrawal');
         

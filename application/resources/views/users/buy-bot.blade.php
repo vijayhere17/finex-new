@@ -375,7 +375,7 @@ window.slotMeta = {
 @endphp
 window.sponsorWalletAddress = @json($sponsorWalletJs);
 </script>
-<script src="{{ URL::to('/') }}/assets/js/users/buy-bot.0.17.js?v=3"></script>
+<script src="{{ URL::to('/') }}/assets/js/users/buy-bot.0.17.js?v=4"></script>
 <script>
     // Sync chain/USDT for wallet helper before optional connect
     window.bscChainId = {{ (int) ($bsc_chain_id ?? config('blockchain.chain_id', 97)) }};

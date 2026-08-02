@@ -121,6 +121,12 @@ contract FinexVault is AccessControl, ReentrancyGuard, Pausable {
         uint256 netAmount
     );
     event IncomeSynced(address indexed user, uint256 amount, uint8 incomeType);
+    event MemberProgressSynced(
+        address indexed user,
+        address indexed sponsor,
+        uint8 currentSlot,
+        uint8 nextSlot
+    );
 
     constructor(address usdtToken, address admin, address operator) {
         require(usdtToken != address(0), "FinexVault: usdt");
@@ -223,6 +229,35 @@ contract FinexVault is AccessControl, ReentrancyGuard, Pausable {
 
     function register(address sponsor) external whenNotPaused {
         _ensureMember(msg.sender, sponsor);
+    }
+
+    /**
+     * @notice Backfill on-chain slot progress for members who already activated
+     *         slots off-chain (legacy admin approval) so the next invest() matches.
+     *         Does not move USDT and does not create Investment rows.
+     */
+    function syncMemberProgress(address user, address sponsor, uint8 currentSlot)
+        external
+        onlyRole(OPERATOR_ROLE)
+        whenNotPaused
+    {
+        require(user != address(0), "FinexVault: user");
+        require(currentSlot <= MAX_SLOT, "FinexVault: slot");
+
+        _ensureMember(user, sponsor);
+        Member storage m = members[user];
+
+        // Only advance (or set) progress — never rewind.
+        require(currentSlot >= m.currentSlot, "FinexVault: rewind");
+
+        if (sponsor != address(0) && m.sponsor == address(0)) {
+            m.sponsor = sponsor;
+        }
+
+        m.currentSlot = currentSlot;
+        m.nextSlot = currentSlot == 0 ? 1 : (currentSlot < MAX_SLOT ? currentSlot + 1 : 0);
+
+        emit MemberProgressSynced(user, m.sponsor, m.currentSlot, m.nextSlot);
     }
 
     function _ensureMember(address user, address sponsor) internal {

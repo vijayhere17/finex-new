@@ -241,7 +241,24 @@ const COMMANDS = {
   getMember,
   getInvestment,
   getSponsorWallet,
+  syncMemberProgress,
 };
+
+async function syncMemberProgress(args) {
+  const { wallet, vault } = await getContracts();
+  if (!wallet) throw new Error('operator key missing');
+  const tx = await vault.syncMemberProgress(
+    args.user,
+    args.sponsor || ethers.ZeroAddress,
+    Number(args.currentSlot || 0)
+  );
+  const receipt = await tx.wait();
+  return ok({
+    txHash: receipt.hash,
+    user: args.user,
+    currentSlot: Number(args.currentSlot || 0),
+  });
+}
 
 async function main() {
   const command = process.argv[2];

@@ -151,7 +151,41 @@ async function processstake()
     }
 
     blockui();
+
+    // If Laravel already has earlier slots (legacy admin path), sync vault first
+    // so invest(nextSlot) does not revert with FinexVault: sequence.
+    const synced = await syncChainSlotsBeforeInvest();
+    if (!synced) {
+        return;
+    }
+
     await investViaFinexVault(payment, decimal, amount);
+}
+
+function syncChainSlotsBeforeInvest()
+{
+    return new Promise(function (resolve) {
+        $.ajax({
+            type: 'POST',
+            url: BASEPATH + '/sync-chain-slots',
+            data: { _token: token },
+            dataType: 'json',
+            success: function (result) {
+                if (result && result.success) {
+                    resolve(true);
+                    return;
+                }
+                erroralert((result && result.error) || 'Could not sync on-chain slots before payment.');
+                unblockui();
+                resolve(false);
+            },
+            error: function () {
+                erroralert('Network error while syncing on-chain slots.');
+                unblockui();
+                resolve(false);
+            }
+        });
+    });
 }
 
 async function ensureBscNetwork()

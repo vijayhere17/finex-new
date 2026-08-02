@@ -312,4 +312,63 @@ class BlockchainService
             'require_onchain_invest' => (bool) config('blockchain.require_onchain_invest'),
         ];
     }
+
+    /**
+     * If Laravel already activated slots (legacy admin path) but FinexVault is behind,
+     * advance on-chain currentSlot/nextSlot so the next paid invest() succeeds.
+     */
+    public function syncMemberProgress(User $user, int $currentSlot): array
+    {
+        if (!$this->enabled()) {
+            return ['success' => false, 'error' => 'disabled'];
+        }
+
+        $wallet = $this->normalizeWallet($user->username);
+        if ($wallet === '') {
+            return ['success' => false, 'error' => 'no wallet'];
+        }
+
+        $sponsorWallet = '';
+        if ((int) $user->referral_id > 0) {
+            $sponsor = User::find($user->referral_id);
+            if ($sponsor) {
+                $sponsorWallet = $this->normalizeWallet($sponsor->username);
+            }
+        }
+
+        // Read chain state first — skip tx if already caught up.
+        $onchain = $this->call('getMember', ['user' => $wallet]);
+        if (!empty($onchain['success'])) {
+            $chainCurrent = (int) ($onchain['currentSlot'] ?? 0);
+            $chainNext = (int) ($onchain['nextSlot'] ?? 1);
+            if ($chainCurrent >= $currentSlot) {
+                return [
+                    'success' => true,
+                    'skipped' => true,
+                    'currentSlot' => $chainCurrent,
+                    'nextSlot' => $chainNext,
+                ];
+            }
+        }
+
+        $log = $this->logTx([
+            'member_id' => $user->id,
+            'tx_type' => 'sync_progress',
+            'amount' => 0,
+            'payload' => ['current_slot' => $currentSlot],
+        ]);
+
+        $result = $this->call('syncMemberProgress', [
+            'user' => $wallet,
+            'sponsor' => $sponsorWallet !== '' ? $sponsorWallet : '0x0000000000000000000000000000000000000000',
+            'currentSlot' => $currentSlot,
+        ]);
+
+        $log->status = !empty($result['success']) ? 'success' : 'failed';
+        $log->tx_hash = $result['txHash'] ?? null;
+        $log->error_message = $result['error'] ?? null;
+        $log->save();
+
+        return $result;
+    }
 }

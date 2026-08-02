@@ -121,4 +121,22 @@ describe('FinexVault', function () {
       'FinexVault: sequence'
     );
   });
+
+  it('syncs off-chain progress so next paid invest matches Laravel slot', async function () {
+    const { usdt, vault, operator, alice, bob } = await deployFixture();
+    const vaultAddr = await vault.getAddress();
+
+    // Laravel already has Slot 1; chain is empty → sync then buy Slot 2
+    await vault.connect(operator).syncMemberProgress(bob.address, alice.address, 1);
+    let m = await vault.members(bob.address);
+    expect(m.currentSlot).to.equal(1);
+    expect(m.nextSlot).to.equal(2);
+
+    await usdt.connect(bob).approve(vaultAddr, ethers.parseEther('20'));
+    await vault.connect(bob).invest(2, alice.address, 22);
+
+    m = await vault.members(bob.address);
+    expect(m.currentSlot).to.equal(2);
+    expect(m.nextSlot).to.equal(3);
+  });
 });

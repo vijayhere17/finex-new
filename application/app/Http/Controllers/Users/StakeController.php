@@ -202,6 +202,57 @@ class StakeController extends Controller
 ])->toJS();
     }
     
+    /**
+     * Align FinexVault slot progress with Laravel before the next paid invest().
+     * Needed when Slot N was activated via legacy admin approval (not on-chain).
+     */
+    public function syncChainSlots(Request $request)
+    {
+        try {
+            if (Auth::user() == null) {
+                return response()->json(['success' => false, 'error' => 'Session is expired.'], 200);
+            }
+
+            $chain = app(\App\Services\Blockchain\BlockchainService::class);
+            if (!$chain->enabled()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Smart contract vault is not configured.',
+                ], 200);
+            }
+
+            $member = Auth::user()->fresh();
+            $progress = $this->buildSlotProgress(
+                $member,
+                StakeMaster::where('is_admin', '=', 0)->where('is_travel', '=', 0)->where('ptype', '=', 2)->orderBy('amount', 'asc')->get()
+            );
+
+            // Sync completed slots only (current). Next paid slot stays for user invest().
+            $currentSlot = (int) ($progress['current_slot'] ?? 0);
+            $result = $chain->syncMemberProgress($member, $currentSlot);
+
+            if (empty($result['success'])) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $result['error'] ?? 'Could not sync on-chain slot progress. Check BLOCKCHAIN_OPERATOR_KEY.',
+                    'detail' => $result,
+                ], 200);
+            }
+
+            return response()->json([
+                'success' => true,
+                'skipped' => !empty($result['skipped']),
+                'current_slot' => $currentSlot,
+                'next_slot' => (int) ($progress['next_slot'] ?? 0),
+                'tx_hash' => $result['txHash'] ?? null,
+                'error' => '',
+            ], 200);
+        } catch (\Throwable $e) {
+            Log::error($e);
+            return response()->json(['success' => false, 'error' => 'Sync failed.'], 200);
+        }
+    }
+
     public function submitBotTxn(Request $request)
     {
         try {
