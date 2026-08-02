@@ -54,6 +54,17 @@ Apply SQL:
 source database/sql/2026_08_01_blockchain_sync_columns.sql
 ```
 
+### Windows / XAMPP note
+
+If Activate shows **Invalid operator response**:
+
+1. Install Node.js and **restart Apache**
+2. Confirm `node -v` works in PowerShell
+3. If Apache still cannot find Node, set in `.env`:
+   `NODE_BINARY=C:\Program Files\nodejs\node.exe`
+4. Ensure `BLOCKCHAIN_OPERATOR_KEY` is set (needed for `/sync-chain-slots`)
+5. Run `php artisan config:clear`
+
 ## Tests
 
 ```bash

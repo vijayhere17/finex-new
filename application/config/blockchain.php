@@ -41,10 +41,13 @@ return [
     'operator_address' => env('BLOCKCHAIN_OPERATOR_ADDRESS', $abiPayload['operator'] ?? ''),
     'operator_key' => env('BLOCKCHAIN_OPERATOR_KEY', env('WITHDRAWAL_PRIVATE_KEY', '')),
 
-    // Node helper used by Laravel (same pattern as existing txn-details.js)
+    // Node helper used by Laravel (Symfony Process — Windows-safe)
     'node_script' => base_path('blockchain/scripts/operator-cli.js'),
 
-    'abi_path' => base_path('blockchain/abi/FinexVault.json'),
+    // Prefer storage deploy copy (written by hardhat deploy), else repo ABI
+    'abi_path' => is_file(storage_path('app/blockchain/FinexVault.json'))
+        ? storage_path('app/blockchain/FinexVault.json')
+        : base_path('blockchain/abi/FinexVault.json'),
 
     // Slot activation requires a verified FinexVault.invest() tx (no admin pending queue).
     'require_onchain_invest' => (bool) env('BLOCKCHAIN_REQUIRE_ONCHAIN_INVEST', true),
