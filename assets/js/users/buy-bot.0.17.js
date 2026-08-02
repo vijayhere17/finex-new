@@ -216,12 +216,38 @@ async function investViaFinexVault(payment, decimal, amount)
             amountwei = web3.utils.toWei(payable_coin.toString(), 'ether');
         }
 
-        const usdt = new web3.eth.Contract(contract_abi, contract_addr);
+        if (!contract_addr || !web3.utils.isAddress(contract_addr)) {
+            erroralert('USDT contract address missing. Set BLOCKCHAIN_USDT_ADDRESS in .env (your MockUSDT).');
+            unblockui();
+            return;
+        }
+        if (!finexVaultAddress || !web3.utils.isAddress(finexVaultAddress)) {
+            erroralert('Vault address missing. Set FINEX_VAULT_ADDRESS in .env.');
+            unblockui();
+            return;
+        }
+
+        // Prefer minimal ERC20 ABI for balance/allowance/approve (avoids ABI mismatch toast)
+        const erc20Abi = [
+            {"inputs":[{"name":"account","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"name":"owner","type":"address"},{"name":"spender","type":"address"}],"name":"allowance","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"name":"spender","type":"address"},{"name":"amount","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}
+        ];
+        const usdt = new web3.eth.Contract(erc20Abi, contract_addr);
         const vault = new web3.eth.Contract(finexVaultAbi, finexVaultAddress);
 
-        let balance = await usdt.methods.balanceOf(accounts[0]).call();
+        let balance;
+        try {
+            balance = await usdt.methods.balanceOf(accounts[0]).call();
+        } catch (balErr) {
+            erroralert(
+                'Cannot read USDT on this network. Use BSC Testnet and set BLOCKCHAIN_USDT_ADDRESS to your MockUSDT: 0x65100813fEB38174Fd26457BbD13dc75D5E5D74c'
+            );
+            unblockui();
+            return;
+        }
         if (BigInt(balance) < BigInt(amountwei)) {
-            erroralert('Insufficient USDT balance to activate this slot.');
+            erroralert('Insufficient Mock USDT balance. Use faucet/transfer to this wallet, then retry.');
             unblockui();
             return;
         }
