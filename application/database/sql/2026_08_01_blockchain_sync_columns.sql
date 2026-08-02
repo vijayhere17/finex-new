@@ -1,17 +1,82 @@
--- Finex blockchain sync columns (phpMyAdmin / SQL-only deploy)
--- Safe to re-run: uses information_schema checks via procedure-free IF NOT EXISTS patterns where possible.
+-- Finex blockchain sync columns
+-- Run in phpMyAdmin on database: ginance_admin
+-- Safe for MySQL 5.7 / MariaDB (no ADD COLUMN IF NOT EXISTS)
 
-ALTER TABLE `users`
-  ADD COLUMN IF NOT EXISTS `sponsor_wallet_total` DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER `auto_upgrade_balance`,
-  ADD COLUMN IF NOT EXISTS `auto_upgrade_used` DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER `sponsor_wallet_total`,
-  ADD COLUMN IF NOT EXISTS `chain_registered` TINYINT(1) NOT NULL DEFAULT 0 AFTER `next_slot`;
+-- users: sponsor wallet breakdown + chain flag
+SET @db := DATABASE();
 
-ALTER TABLE `staked_users`
-  ADD COLUMN IF NOT EXISTS `onchain_investment_id` BIGINT UNSIGNED NULL DEFAULT NULL AFTER `slot_number`,
-  ADD COLUMN IF NOT EXISTS `unlocked_roi` DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER `total_roi_paid`,
-  ADD COLUMN IF NOT EXISTS `withdrawn_roi` DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER `unlocked_roi`,
-  ADD COLUMN IF NOT EXISTS `qualifying_directs` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `withdrawn_roi`,
-  ADD COLUMN IF NOT EXISTS `chain_tx_hash` VARCHAR(100) NULL DEFAULT NULL AFTER `qualifying_directs`;
+SET @exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'users' AND COLUMN_NAME = 'sponsor_wallet_total'
+);
+SET @sql := IF(@exists = 0,
+  'ALTER TABLE `users` ADD COLUMN `sponsor_wallet_total` DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER `auto_upgrade_balance`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'users' AND COLUMN_NAME = 'auto_upgrade_used'
+);
+SET @sql := IF(@exists = 0,
+  'ALTER TABLE `users` ADD COLUMN `auto_upgrade_used` DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER `sponsor_wallet_total`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'users' AND COLUMN_NAME = 'chain_registered'
+);
+SET @sql := IF(@exists = 0,
+  'ALTER TABLE `users` ADD COLUMN `chain_registered` TINYINT(1) NOT NULL DEFAULT 0 AFTER `next_slot`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- staked_users: on-chain sync + ROI unlock
+SET @exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'staked_users' AND COLUMN_NAME = 'onchain_investment_id'
+);
+SET @sql := IF(@exists = 0,
+  'ALTER TABLE `staked_users` ADD COLUMN `onchain_investment_id` BIGINT UNSIGNED NULL DEFAULT NULL AFTER `slot_number`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'staked_users' AND COLUMN_NAME = 'unlocked_roi'
+);
+SET @sql := IF(@exists = 0,
+  'ALTER TABLE `staked_users` ADD COLUMN `unlocked_roi` DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER `total_roi_paid`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'staked_users' AND COLUMN_NAME = 'withdrawn_roi'
+);
+SET @sql := IF(@exists = 0,
+  'ALTER TABLE `staked_users` ADD COLUMN `withdrawn_roi` DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER `unlocked_roi`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'staked_users' AND COLUMN_NAME = 'qualifying_directs'
+);
+SET @sql := IF(@exists = 0,
+  'ALTER TABLE `staked_users` ADD COLUMN `qualifying_directs` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `withdrawn_roi`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'staked_users' AND COLUMN_NAME = 'chain_tx_hash'
+);
+SET @sql := IF(@exists = 0,
+  'ALTER TABLE `staked_users` ADD COLUMN `chain_tx_hash` VARCHAR(100) NULL DEFAULT NULL AFTER `qualifying_directs`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS `blockchain_transactions` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

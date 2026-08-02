@@ -138,8 +138,10 @@ class AutoUpgradeService
             return;
         }
 
-        $user->sponsor_wallet_total = ((float) ($user->sponsor_wallet_total ?? 0)) + $slotAmount;
-        $user->save();
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'sponsor_wallet_total')) {
+            $user->sponsor_wallet_total = ((float) ($user->sponsor_wallet_total ?? 0)) + $slotAmount;
+            $user->save();
+        }
     }
 
     /**
@@ -217,7 +219,9 @@ class AutoUpgradeService
                 }
 
                 $locked->auto_upgrade_balance = ((float) $locked->auto_upgrade_balance) - $price;
-                $locked->auto_upgrade_used = ((float) ($locked->auto_upgrade_used ?? 0)) + $price;
+                if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'auto_upgrade_used')) {
+                    $locked->auto_upgrade_used = ((float) ($locked->auto_upgrade_used ?? 0)) + $price;
+                }
                 $locked->current_slot = $nextSlot;
                 $locked->next_slot = ($nextSlot < 12) ? ($nextSlot + 1) : 0;
                 $locked->save();

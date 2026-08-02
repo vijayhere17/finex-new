@@ -209,14 +209,21 @@ class RoiUnlockService
      */
     public function availableWithdrawalAmount(int $memberId, float $earningBalance): float
     {
-        $generated = (float) UserStaked::where('member_id', $memberId)->sum('total_roi_paid');
-        $unlocked = (float) UserStaked::where('member_id', $memberId)->sum('unlocked_roi');
-        $lockedRoi = max(0, round($generated - $unlocked, 4));
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('staked_users', 'unlocked_roi')) {
+                return max(0, round($earningBalance, 4));
+            }
 
-        // If Daily ROI is only credited on unlock, lockedRoi in wallet should be ~0.
-        // Keep this guard for mixed/legacy rows.
-        $available = round($earningBalance - $lockedRoi, 4);
+            $generated = (float) UserStaked::where('member_id', $memberId)->sum('total_roi_paid');
+            $unlocked = (float) UserStaked::where('member_id', $memberId)->sum('unlocked_roi');
+            $lockedRoi = max(0, round($generated - $unlocked, 4));
 
-        return max(0, $available);
+            // If Daily ROI is only credited on unlock, lockedRoi in wallet should be ~0.
+            $available = round($earningBalance - $lockedRoi, 4);
+
+            return max(0, $available);
+        } catch (\Throwable $e) {
+            return max(0, round($earningBalance, 4));
+        }
     }
 }

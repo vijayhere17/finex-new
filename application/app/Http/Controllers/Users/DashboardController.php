@@ -48,8 +48,25 @@ class DashboardController extends Controller
         $sponsorWallet = app(AutoUpgradeService::class)->getSponsorWalletBreakdown($user);
         $roiUnlock = app(\App\Services\RoiUnlockService::class);
         $earningBalance = (float) $balanceCon->getearningbalance($userId);
-        $totalRoiGenerated = (float) UserStaked::where('member_id', $userId)->sum('total_roi_paid');
-        $unlockedRoi = (float) UserStaked::where('member_id', $userId)->sum('unlocked_roi');
+
+        // Guard missing blockchain SQL columns (prevents HTTP 500 before migration).
+        $totalRoiGenerated = 0.0;
+        $unlockedRoi = 0.0;
+        try {
+            $totalRoiGenerated = (float) UserStaked::where('member_id', $userId)->sum('total_roi_paid');
+            if (\Illuminate\Support\Facades\Schema::hasColumn('staked_users', 'unlocked_roi')) {
+                $unlockedRoi = (float) UserStaked::where('member_id', $userId)->sum('unlocked_roi');
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Dashboard ROI totals: '.$e->getMessage());
+        }
+
+        $withdrawable = $earningBalance;
+        try {
+            $withdrawable = $roiUnlock->availableWithdrawalAmount($userId, $earningBalance);
+        } catch (\Throwable $e) {
+            \Log::warning('Dashboard withdrawable: '.$e->getMessage());
+        }
 
         $fx = (object) [
             'current_slot' => $progress['current_slot'],
@@ -63,10 +80,10 @@ class DashboardController extends Controller
             'unlocked_roi' => $unlockedRoi,
             'level_roi' => (float) $balanceCon->getearningsum($userId, 4),
             'auto_upgrade_balance' => (float) ($user->auto_upgrade_balance ?? 0),
-            'sponsor_wallet_total' => $sponsorWallet['total'],
-            'auto_upgrade_used' => $sponsorWallet['auto_upgrade_used'],
+            'sponsor_wallet_total' => $sponsorWallet['total'] ?? 0,
+            'auto_upgrade_used' => $sponsorWallet['auto_upgrade_used'] ?? 0,
             'available_wallet' => $earningBalance,
-            'withdrawable_wallet' => $roiUnlock->availableWithdrawalAmount($userId, $earningBalance),
+            'withdrawable_wallet' => $withdrawable,
             'total_withdrawn' => (float) WithdrawalLog::where('member_id', $userId)->where('status', 2)->sum('payable'),
             'vault_address' => config('blockchain.vault_address'),
             'blockchain_enabled' => (bool) config('blockchain.enabled'),
