@@ -46,8 +46,8 @@ return [
 
     'abi_path' => base_path('blockchain/abi/FinexVault.json'),
 
-    // When true, slot activation requires a real FinexVault.invest() tx (or verified recordInvestment)
-    'require_onchain_invest' => (bool) env('BLOCKCHAIN_REQUIRE_ONCHAIN_INVEST', false),
+    // Slot activation requires a verified FinexVault.invest() tx (no admin pending queue).
+    'require_onchain_invest' => (bool) env('BLOCKCHAIN_REQUIRE_ONCHAIN_INVEST', true),
 
     // When true, withdrawals are paid from FinexVault instead of external send-edu.php
     'withdrawals_via_vault' => (bool) env('BLOCKCHAIN_WITHDRAWALS_VIA_VAULT', true),

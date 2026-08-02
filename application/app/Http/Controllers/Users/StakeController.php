@@ -211,18 +211,8 @@ class StakeController extends Controller
                 'payment' => 'required',
                 'amount' => 'required',
                 'status' => 'required',
+                'hash' => 'required',
             ]);
-
-            $id = $request->get('id');
-
-            if ($id == 0) 
-            {
-                $rules['hash'] = 'required|unique:staked_requests';
-            } 
-            else 
-            {
-                $rules['hash'] = 'required'; // No uniqueness check for existing records
-            }
 
             if ($v->fails())
             {
@@ -233,6 +223,39 @@ class StakeController extends Controller
             {
 				return response()->json(array('success'=>false,'error'=> 'Session is expired.'), 200);
 			}
+
+            $id = (int) $request->get('id');
+            $status = (int) $request->get('status');
+            $hash = trim((string) $request->get('hash'));
+
+            // Instant on-chain buy only — reject old pending/admin-approval path.
+            if ($status === 0
+                || str_starts_with($hash, 'TEST-')
+                || str_starts_with($hash, 'TEMP-')
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'activated' => false,
+                    'error' => 'Admin approval topups are disabled. Please activate with your wallet via the smart contract.',
+                ], 200);
+            }
+
+            if (!in_array($status, [1, 2], true)) {
+                return response()->json([
+                    'success' => false,
+                    'activated' => false,
+                    'error' => 'Invalid payment status.',
+                ], 200);
+            }
+
+            $chain = app(\App\Services\Blockchain\BlockchainService::class);
+            if (!$chain->enabled()) {
+                return response()->json([
+                    'success' => false,
+                    'activated' => false,
+                    'error' => 'Smart contract vault is not configured (FINEX_VAULT_ADDRESS).',
+                ], 200);
+            }
 			
 			$date = date("Y-m-d H:i:s");
 			
@@ -241,22 +264,20 @@ class StakeController extends Controller
             $stake_id = $request->get('stake_id');
             $amount =  $request->get('amount');
             $payment = $request->get('payment');
-            $status = $request->get('status');
-            $hash = $request->get('hash');
 
             // Fixed sequential slots only — no custom / free-typed amounts.
             $slotAmounts = $this->getFixedSlotAmounts();
             $amountFloat = (float) $amount;
             if (!is_numeric($amount) || !in_array($amountFloat, array_map('floatval', $slotAmounts), true))
             {
-                return response()->json(array('success'=>false, 'error'=>'Invalid slot amount. Please activate a fixed slot.'), 200);
+                return response()->json(array('success'=>false, 'activated'=>false, 'error'=>'Invalid slot amount. Please activate a fixed slot.'), 200);
             }
 
             // Enforce sequential activation: only the next eligible slot may be purchased.
             $slotProgress = $this->buildSlotProgress(Auth::user(), StakeMaster::where('is_admin','=',0)->where('is_travel','=',0)->where('ptype','=',2)->orderBy('amount', 'asc')->get());
             if ((float) $slotProgress['next_slot_amount'] <= 0 || $amountFloat !== (float) $slotProgress['next_slot_amount'])
             {
-                return response()->json(array('success'=>false, 'error'=>'Please activate slots in sequence. Only the next eligible slot can be purchased.'), 200);
+                return response()->json(array('success'=>false, 'activated'=>false, 'error'=>'Please activate slots in sequence. Only the next eligible slot can be purchased.'), 200);
             }
 
             // Rate comes from the amount actually paid, not the client-selected package.
@@ -267,18 +288,47 @@ class StakeController extends Controller
                 $kit = StakeMaster::find($stake_id);
             }
 
+            if ($kit == null) {
+                return response()->json(['success' => false, 'activated' => false, 'error' => 'Slot package not found.'], 200);
+            }
+
             // ------------------------------------------------------------------------------------------------------------------
+
+            // Reuse existing row by id or by hash (avoid duplicate pending rows).
+            $object = null;
+            if ($id > 0) {
+                $object = StakeRequest::find($id);
+            }
+            if ($object == null && $hash !== '') {
+                $object = StakeRequest::where('hash', $hash)->first();
+            }
             
-            if($id == 0)
+            if($object == null)
             {
+                // Unique hash for new rows
+                if (StakeRequest::where('hash', $hash)->exists()) {
+                    return response()->json([
+                        'success' => false,
+                        'activated' => false,
+                        'error' => 'This transaction hash was already used.',
+                    ], 200);
+                }
+
                 $invoice_no = self::generateInvoice();
                 $object = new StakeRequest;
                 $object->payment = $payment;
                 $object->invoice_no = $invoice_no;
             }
-            else
-            {
-                $object = StakeRequest::find($id);
+
+            // Already activated for this request
+            if ((int) $object->status === 2 && UserStaked::where('s_r_id', $object->id)->exists()) {
+                return response()->json([
+                    'success' => true,
+                    'activated' => true,
+                    'id' => $object->id,
+                    'message' => 'Slot already activated.',
+                    'error' => '',
+                ], 200);
             }
             
             $object->member_id = Auth::user()->id;
@@ -290,7 +340,8 @@ class StakeController extends Controller
             $object->stake_coin = number_format((float)$amount/$coin_rate, 8, '.', '');
 
             $object->hash = $hash;
-            $object->status = $status;
+            // status 1 = on-chain submitted / confirming; 2 = activated
+            $object->status = ($status === 2) ? 1 : $status;
 
             $object->return_date = date('Y-m-d H:i:s', strtotime($date. ' + '.$kit->months.' days'));
             $object->apy = $kit->percantage;
@@ -299,65 +350,75 @@ class StakeController extends Controller
             
             $object->save();
 
-            if($status == 2)
-            {
-                $chain = app(\App\Services\Blockchain\BlockchainService::class);
-                $activated = false;
-                $investMeta = null;
-
-                // Prefer FinexVault Invested-event verification (BSC testnet/mainnet).
-                if ($chain->enabled() && !str_starts_with((string) $hash, 'TEST-') && !str_starts_with((string) $hash, 'TEMP-')) {
-                    $investMeta = $chain->verifyInvestTransaction($hash);
-                    if (!empty($investMeta['verified'])) {
-                        $expectedSlot = (int) ($slotProgress['next_slot'] ?? 0);
-                        $gotSlot = (int) ($investMeta['slotNumber'] ?? 0);
-                        $gotAmount = (float) ($investMeta['packageAmount'] ?? 0);
-                        if ($gotSlot === $expectedSlot && abs($gotAmount - $amountFloat) < 0.0001) {
-                            $activated = true;
-                        }
-                    }
-                }
-
-                if (!$activated) {
-                    // Legacy fallback: plain USDT transfer verify (mainnet tooling path)
-                    $rpc_url = config('blockchain.rpc_url', 'https://bsc-dataseed1.binance.org/');
-                    $response = shell_exec("node /home/eudstake/node/txn-details.js ".$hash." ".$rpc_url);
-                    $result = json_decode($response, true);
-                    if (!empty($result['status'])) {
-                        $activated = true;
-                    }
-                }
-
-                if ($activated)
-                {
-                    $stake = $this->setStakeActivation($object->member_id, $object->stake_id, $object->amount, $object->id);
-                    if ($stake && $investMeta) {
-                        $investMeta['txHash'] = $hash;
-                        $chain->attachInvestResult($stake, $investMeta);
-                    }
-
-                    return response()->json(array('success'=>true, 'message'=>'Your Stake Successfully!', 'error'=>''), 200);
-                }
-                else
-                {
-                    $object->status = 0;
-                    $object->save();
-
-                    return response()->json(array('success'=>true, 'message'=>'Your Stake Request Submited Successfully!<br>Request Process Few Minutes.', 'error'=>''), 200);
-                }
+            // status 1: tx hash received, wait for receipt finalize call
+            if ($status === 1) {
+                return response()->json([
+                    'success' => true,
+                    'activated' => false,
+                    'id' => $object->id,
+                    'message' => 'Transaction submitted. Confirming on-chain…',
+                    'error' => '',
+                ], 200);
             }
 
-            return response()->json(array(
-                'success'=>true,
-                'id'=>$object->id,
-                'message'=>($status == 0
-                    ? 'Your topup request was submitted. Waiting for admin approval.'
-                    : ''),
-                'error'=>''
-            ), 200);
+            // status 2: verify FinexVault.invest and activate instantly (no admin).
+            $investMeta = $chain->verifyInvestTransaction($hash);
+            $activated = false;
+            $verifyError = '';
+
+            if (!empty($investMeta['verified'])) {
+                $expectedSlot = (int) ($slotProgress['next_slot'] ?? 0);
+                $gotSlot = (int) ($investMeta['slotNumber'] ?? 0);
+                $gotAmount = (float) ($investMeta['packageAmount'] ?? 0);
+                $payer = strtolower((string) ($investMeta['user'] ?? ''));
+                $memberWallet = $chain->normalizeWallet(Auth::user()->username);
+
+                if ($payer !== '' && $memberWallet !== '' && $payer !== $memberWallet) {
+                    $verifyError = 'Transaction wallet does not match your login wallet.';
+                } elseif ($gotSlot !== $expectedSlot || abs($gotAmount - $amountFloat) >= 0.0001) {
+                    $verifyError = 'On-chain slot/amount does not match the selected slot.';
+                } else {
+                    $activated = true;
+                }
+            } else {
+                $verifyError = $investMeta['reason'] ?? ($investMeta['error'] ?? 'Invested event not found for this transaction.');
+            }
+
+            if ($activated)
+            {
+                $stake = $this->setStakeActivation($object->member_id, $object->stake_id, $object->amount, $object->id);
+                $object->status = 2;
+                $object->save();
+
+                if ($stake && $investMeta) {
+                    $investMeta['txHash'] = $hash;
+                    $chain->attachInvestResult($stake, $investMeta);
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'activated' => true,
+                    'id' => $object->id,
+                    'message' => 'Slot activated successfully! Payment secured by smart contract.',
+                    'error' => '',
+                ], 200);
+            }
+
+            // Do NOT send to admin pending queue — keep as processing and return error.
+            $object->status = 1;
+            $object->save();
+
+            return response()->json([
+                'success' => false,
+                'activated' => false,
+                'id' => $object->id,
+                'message' => '',
+                'error' => 'Could not verify on-chain investment yet: '.$verifyError
+                    .' If MetaMask confirmed the payment, wait a few seconds and try Activate again, or contact support with tx '.$hash,
+            ], 200);
         } catch(Exception $exception) {
             Log::error($exception);
-            return response()->json(array('success'=>false,'error'=> 'An error occurred processing'), 200);
+            return response()->json(array('success'=>false, 'activated'=>false, 'error'=> 'An error occurred processing'), 200);
         }
     }
     

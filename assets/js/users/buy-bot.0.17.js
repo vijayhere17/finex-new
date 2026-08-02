@@ -8,7 +8,7 @@ let payable_coin = 0;
 
 const deposit_addr = PHP2JS.data.to_address;
 
-// FinexVault (BSC) — funds are held by the smart contract, not an EOA deposit wallet.
+// FinexVault (BSC) — instant on-chain buy, no admin approval.
 const blockchainEnabled = !!(PHP2JS.data.blockchain_enabled);
 const finexVaultAddress = PHP2JS.data.finex_vault_address || '';
 let finexVaultAbi = [];
@@ -144,21 +144,59 @@ async function processstake()
     // Refresh payable from the fixed slot amount before sending chain tx.
     getcalculation();
 
-    blockui();
-
-    // Vault path: approve USDT → FinexVault.invest(slot, sponsor, offchainId)
-    if (blockchainEnabled && finexVaultAddress && finexVaultAbi.length) {
-        await investViaFinexVault(payment, decimal, amount);
-        return;
+    // Instant on-chain buy only — no pending / admin approval path.
+    if (!blockchainEnabled || !finexVaultAddress || !finexVaultAbi.length) {
+        erroralert('Smart contract vault is not configured. Set FINEX_VAULT_ADDRESS in .env and reload.');
+        return false;
     }
 
-    // TEMP fallback (no vault configured): pending admin approval without chain tx.
-    submitHashRequest(0, payment, 0, 'TEST-PENDING-' + Date.now());
+    blockui();
+    await investViaFinexVault(payment, decimal, amount);
+}
+
+async function ensureBscNetwork()
+{
+    if (!window.ethereum) {
+        throw new Error('MetaMask (or a Web3 wallet) is required.');
+    }
+
+    const hexId = '0x' + Number(bscChainId).toString(16);
+    try {
+        await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: hexId }],
+        });
+    } catch (switchError) {
+        // 4902 = chain not added
+        if (switchError && (switchError.code === 4902 || switchError.code === -32603)) {
+            await window.ethereum.request({
+                method: 'wallet_addEthereumChain',
+                params: [{
+                    chainId: hexId,
+                    chainName: bscChainId === 97 ? 'BSC Testnet' : 'BNB Smart Chain',
+                    nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+                    rpcUrls: [
+                        bscChainId === 97
+                            ? 'https://data-seed-prebsc-1-s1.binance.org:8545'
+                            : 'https://bsc-dataseed1.binance.org/'
+                    ],
+                    blockExplorerUrls: [
+                        bscChainId === 97
+                            ? 'https://testnet.bscscan.com'
+                            : 'https://bscscan.com'
+                    ],
+                }],
+            });
+        } else {
+            throw switchError;
+        }
+    }
 }
 
 async function investViaFinexVault(payment, decimal, amount)
 {
     try {
+        await ensureBscNetwork();
         await connectwallet();
 
         const slotNumber = parseInt(
@@ -169,17 +207,13 @@ async function investViaFinexVault(payment, decimal, amount)
             10
         );
 
-        if(decimal == 18)
-        {
-            var amountwei = web3.utils.toWei(payable_coin.toString(), 'ether');
-        }
-        else if(decimal == 6)
-        {
-            var amountwei = web3.utils.toWei(amount.toString(), 'mwei');
-        }
-        else
-        {
-            var amountwei = web3.utils.toWei(payable_coin.toString(), 'ether');
+        var amountwei;
+        if (decimal == 18) {
+            amountwei = web3.utils.toWei(payable_coin.toString(), 'ether');
+        } else if (decimal == 6) {
+            amountwei = web3.utils.toWei(amount.toString(), 'mwei');
+        } else {
+            amountwei = web3.utils.toWei(payable_coin.toString(), 'ether');
         }
 
         const usdt = new web3.eth.Contract(contract_abi, contract_addr);
@@ -187,7 +221,7 @@ async function investViaFinexVault(payment, decimal, amount)
 
         let balance = await usdt.methods.balanceOf(accounts[0]).call();
         if (BigInt(balance) < BigInt(amountwei)) {
-            erroralert("Insufficient USDT balance to activate this slot.");
+            erroralert('Insufficient USDT balance to activate this slot.');
             unblockui();
             return;
         }
@@ -207,7 +241,6 @@ async function investViaFinexVault(payment, decimal, amount)
             });
         }
 
-        // Sponsor wallet from referral (Laravel user.username of sponsor) if provided
         let sponsor = (window.sponsorWalletAddress || PHP2JS.data.sponsor_wallet || '0x0000000000000000000000000000000000000000');
         if (!sponsor || sponsor === '') {
             sponsor = '0x0000000000000000000000000000000000000000';
@@ -226,23 +259,31 @@ async function investViaFinexVault(payment, decimal, amount)
             gas: web3.utils.toHex(gas2),
             gasPrice: web3.utils.toHex(gasprice2),
         }).on('transactionHash', (hash) => {
-            submitHashRequest(rid, payment, 1, hash);
+            // Record processing hash (status 1) — not pending admin.
+            submitHashRequest(rid, payment, 1, hash, false);
         }).on('receipt', (receipt) => {
             if (receipt.status) {
-                submitHashRequest(rid, payment, 2, receipt.transactionHash);
+                // Instant activation after confirmed vault invest.
+                submitHashRequest(rid, payment, 2, receipt.transactionHash, true);
+            } else {
+                erroralert('On-chain investment failed.');
+                unblockui();
             }
         }).on('error', (error) => {
-            erroralert(error.message || "Vault investment failed.");
+            erroralert(error.message || 'Vault investment failed.');
             unblockui();
         });
     } catch (err) {
         console.log(err);
-        erroralert(err.message || "An unexpected error occurred.");
+        erroralert(err.message || 'An unexpected error occurred.');
         unblockui();
     }
 }
 
-async function submitHashRequest(id, payment, status, hash)
+/**
+ * @param {boolean} finalize - when true, show result and redirect after status 2
+ */
+async function submitHashRequest(id, payment, status, hash, finalize)
 {
     const stake_id = $("input[name=package]:checked").attr('stakeid');
     const amount = $("#topup_amount").val();
@@ -259,21 +300,38 @@ async function submitHashRequest(id, payment, status, hash)
 
     $.ajax({
         type: 'POST',
-        url: BASEPATH + "/process-submit-buy-bot",
+        url: BASEPATH + '/process-submit-buy-bot',
         data: reqObj,
         dataType: 'json',
         success: function(result) {
             if (result.success) {
-                rid = result.id;
-                // status 0 = Pending (test mode) | status 2 = Success after on-chain pay
-                if(status == 0 || status == 2)
-                {
+                if (result.id) {
+                    rid = result.id;
+                }
+                if (finalize || status == 2) {
                     unblockui();
-                    successalert(result.message || 'Topup request submitted. Waiting for admin approval.');
-                    window.location.href = BASEPATH+'/bot-request';
+                    if (result.activated) {
+                        successalert(result.message || 'Slot activated successfully on-chain!');
+                        window.location.href = BASEPATH + '/dashboard';
+                    } else {
+                        erroralert(result.error || result.message || 'Payment confirmed but activation failed. Contact support with your tx hash.');
+                    }
                 }
             } else {
-                erroralert(result.error);
+                if (finalize || status == 2) {
+                    erroralert(result.error || 'Activation failed.');
+                    unblockui();
+                } else if (status == 1 && result.id) {
+                    rid = result.id;
+                } else if (status != 1) {
+                    erroralert(result.error || 'Request failed.');
+                    unblockui();
+                }
+            }
+        },
+        error: function() {
+            if (finalize || status == 2) {
+                erroralert('Network error while confirming activation.');
                 unblockui();
             }
         }
