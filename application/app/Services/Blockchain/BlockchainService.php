@@ -143,7 +143,9 @@ class BlockchainService
 
     protected function resolveNodeBinary(): string
     {
-        $configured = (string) env('NODE_BINARY', '');
+        $configured = trim((string) config('blockchain.node_binary', env('NODE_BINARY', '')));
+        // Normalize Windows path from .env (forward slashes / escaped backslashes)
+        $configured = str_replace(['/', '\\\\'], DIRECTORY_SEPARATOR, $configured);
         if ($configured !== '' && is_file($configured)) {
             return $configured;
         }

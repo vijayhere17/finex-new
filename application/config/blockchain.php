@@ -5,15 +5,41 @@
  * Laravel remains the management layer; FinexVault holds USDT.
  */
 
-$deploymentFile = storage_path('app/blockchain/FinexVault.json');
-$deployment = is_file($deploymentFile)
-    ? json_decode((string) file_get_contents($deploymentFile), true)
-    : [];
+$readJson = static function (string $path): array {
+    try {
+        if (!is_file($path)) {
+            return [];
+        }
+        $decoded = json_decode((string) file_get_contents($path), true);
+        return is_array($decoded) ? $decoded : [];
+    } catch (\Throwable $e) {
+        return [];
+    }
+};
 
-$abiFile = base_path('blockchain/abi/FinexVault.json');
-$abiPayload = is_file($abiFile)
-    ? json_decode((string) file_get_contents($abiFile), true)
-    : $deployment;
+$deployment = [];
+$abiPayload = [];
+
+try {
+    $deployment = $readJson(storage_path('app/blockchain/FinexVault.json'));
+    $abiPayload = $readJson(base_path('blockchain/abi/FinexVault.json'));
+    if ($abiPayload === []) {
+        $abiPayload = $deployment;
+    }
+} catch (\Throwable $e) {
+    $deployment = [];
+    $abiPayload = [];
+}
+
+$abiPath = base_path('blockchain/abi/FinexVault.json');
+try {
+    $storageAbi = storage_path('app/blockchain/FinexVault.json');
+    if (is_file($storageAbi)) {
+        $abiPath = $storageAbi;
+    }
+} catch (\Throwable $e) {
+    // keep default
+}
 
 return [
 
@@ -41,13 +67,13 @@ return [
     'operator_address' => env('BLOCKCHAIN_OPERATOR_ADDRESS', $abiPayload['operator'] ?? ''),
     'operator_key' => env('BLOCKCHAIN_OPERATOR_KEY', env('WITHDRAWAL_PRIVATE_KEY', '')),
 
+    // Optional absolute node binary. Prefer forward slashes on Windows.
+    'node_binary' => env('NODE_BINARY', ''),
+
     // Node helper used by Laravel (Symfony Process — Windows-safe)
     'node_script' => base_path('blockchain/scripts/operator-cli.js'),
 
-    // Prefer storage deploy copy (written by hardhat deploy), else repo ABI
-    'abi_path' => is_file(storage_path('app/blockchain/FinexVault.json'))
-        ? storage_path('app/blockchain/FinexVault.json')
-        : base_path('blockchain/abi/FinexVault.json'),
+    'abi_path' => $abiPath,
 
     // Slot activation requires a verified FinexVault.invest() tx (no admin pending queue).
     'require_onchain_invest' => (bool) env('BLOCKCHAIN_REQUIRE_ONCHAIN_INVEST', true),
